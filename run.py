@@ -2,6 +2,17 @@
 import sys
 import os
 import time
+import re
+
+def grep_file(filepath, term):
+    """
+    Simple grep-like function for files
+    """
+    with open(filepath) as fd:
+        for line in fd:
+            if re.search(term, line):
+                return True
+    return False
 
 # Get targeting info
 fqdn = sys.argv[1]
@@ -42,24 +53,14 @@ for line in lines:
   if (("Host:" in line) and ("Ports:" in line) and ("80/open/tcp" in line or "443/open/tcp" in line)):
     print("http/https is open, so we'll observatory it...")
     command = "curl -X POST -d '' https://http-observatory.security.mozilla.org/api/v1/analyze?host=" + fqdn + " > /app/results/" + fqdn + "/observatory.txt"
-    os.system(command)
-    print("Giving observatory some time to complete scan before grabbing results...")
-    time.sleep(20)
-    os.system(command)
+    max_retries = 300
+    cur_retries = 0
+    while (grep_file("/app/results/{}/observatory.txt".format(fqdn), "PENDING") and cur_retries < max_retries):
+        cur_retries = cur_retries + 1
+        os.system(command)
+        time.sleep(1)
+        print("Waiting for observatory scan results... (attempt {} of {})".format(cur_retries, max_retries))
   if (("Host:" in line) and ("Ports:" in line) and ("22/open/tcp" in line)):
     print("ssh is open, so we'll ssh_scan it...")
     command = "ssh_scan -t " + fqdn + " -o /app/results/" + fqdn + "/ssh_scan.txt"
     os.system(command)
-
-# Do procedure X (save output to /app/results)
-
-
-# Do procedure Y (save output to /app/results)
-
-
-# Do procedure Z (save output to /app/results)
-
-
-# Do reporting (take all the output from the prior runs, zip it up, and attach to BMO)
-command = "tar -zcvf /app/results/" + fqdn + ".tar.gz /app/results/" + fqdn + "/"
-os.system(command)
